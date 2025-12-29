@@ -32,13 +32,31 @@ RUN curl -f -L -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
 # (Optional verify step: This will fail the build if the files are too small/corrupted)
 RUN if [ $(stat -c%s "latex-workshop.vsix") -lt 10000 ]; then echo "Error: Download failed"; exit 1; fi
 
-# 4. Create an 'Offline Install' Script
+# 4. Create an 'Offline Install' Script (Manual Extraction)
+# We use 'unzip' and 'jq' to install extensions without needing the 'code' CLI.
 RUN echo '#!/bin/bash' > /opt/vsix-cache/install-extensions.sh \
+    && echo 'EXT_DIR="$HOME/.vscode-server/extensions"' >> /opt/vsix-cache/install-extensions.sh \
+    && echo 'mkdir -p "$EXT_DIR"' >> /opt/vsix-cache/install-extensions.sh \
     && echo 'for file in /opt/vsix-cache/*.vsix; do' >> /opt/vsix-cache/install-extensions.sh \
-    && echo '  code --install-extension "$file" --force' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    echo "Installing $file..."' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    # Unzip to a temporary directory' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    unzip -q "$file" -d extension_temp' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    # Read metadata to determine the correct folder name' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    PUB=$(jq -r ".publisher" extension_temp/extension/package.json)' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    NAME=$(jq -r ".name" extension_temp/extension/package.json)' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    VER=$(jq -r ".version" extension_temp/extension/package.json)' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    TARGET="$EXT_DIR/$PUB.$NAME-$VER"' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    # Move if it does not exist yet' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    if [ ! -d "$TARGET" ]; then' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '        mv extension_temp/extension "$TARGET"' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '        echo "Installed to $TARGET"' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    else' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '        echo "Extension already installed."' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    fi' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    rm -rf extension_temp' >> /opt/vsix-cache/install-extensions.sh \
     && echo 'done' >> /opt/vsix-cache/install-extensions.sh \
     && chmod +x /opt/vsix-cache/install-extensions.sh
-
+    
 # Switch back to root
 USER root
 WORKDIR /
