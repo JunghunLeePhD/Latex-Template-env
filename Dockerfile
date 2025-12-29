@@ -81,9 +81,15 @@ RUN echo '#!/bin/bash' > /opt/vsix-cache/install-extensions.sh \
     && echo '    fi' >> /opt/vsix-cache/install-extensions.sh \
     && echo '    rm -rf extension_temp' >> /opt/vsix-cache/install-extensions.sh \
     && echo 'done' >> /opt/vsix-cache/install-extensions.sh \
+    # --- NEW: Add the notification message ---
+    && echo 'if command -v code >/dev/null 2>&1; then' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    code --status-message "✅ LaTeX Setup Complete! Please Reload Window (Ctrl+R) to activate extensions."' >> /opt/vsix-cache/install-extensions.sh \
+    && echo 'fi' >> /opt/vsix-cache/install-extensions.sh \
+    # -----------------------------------------
     && chmod +x /opt/vsix-cache/install-extensions.sh
 
 # Switch back to root
 USER root
 WORKDIR /
 ENV DEBIAN_FRONTEND=dialog
+
