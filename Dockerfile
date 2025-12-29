@@ -37,10 +37,15 @@ RUN echo "Resolving Code Spell Checker..." \
 RUN unzip -tq latex-workshop.vsix && unzip -tq code-spell-checker.vsix \
     && echo "✅ Extensions downloaded and verified successfully."
 
-# 4. Create an 'Offline Install' Script with Notification
+# 4. Create an 'Offline Install' Script (Extensions + VS Code Settings)
+# This script does three things:
+# 1. Installs extensions offline.
+# 2. Injects a 'settings.json' file to configure ChkTeX (disabling warning 30).
+# 3. Notifies the user to reload.
 RUN echo '#!/bin/bash' > /opt/vsix-cache/install-extensions.sh \
     && echo 'EXT_DIR="$HOME/.vscode-server/extensions"' >> /opt/vsix-cache/install-extensions.sh \
     && echo 'mkdir -p "$EXT_DIR"' >> /opt/vsix-cache/install-extensions.sh \
+    # --- INSTALL EXTENSIONS ---
     && echo 'for file in /opt/vsix-cache/*.vsix; do' >> /opt/vsix-cache/install-extensions.sh \
     && echo '    echo "Installing $file..."' >> /opt/vsix-cache/install-extensions.sh \
     && echo '    unzip -q "$file" -d extension_temp' >> /opt/vsix-cache/install-extensions.sh \
@@ -56,14 +61,18 @@ RUN echo '#!/bin/bash' > /opt/vsix-cache/install-extensions.sh \
     && echo '    fi' >> /opt/vsix-cache/install-extensions.sh \
     && echo '    rm -rf extension_temp' >> /opt/vsix-cache/install-extensions.sh \
     && echo 'done' >> /opt/vsix-cache/install-extensions.sh \
+    # --- CONFIGURE VS CODE SETTINGS (FIX CHKTEX) ---
+    && echo 'SETTINGS_DIR="$HOME/.vscode-server/data/Machine"' >> /opt/vsix-cache/install-extensions.sh \
+    && echo 'mkdir -p "$SETTINGS_DIR"' >> /opt/vsix-cache/install-extensions.sh \
+    && echo 'if [ ! -f "$SETTINGS_DIR/settings.json" ]; then' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '   echo "Injecting VS Code settings..."' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '   echo "{ \"latex-workshop.linting.chktex.args\": [\"-wall\", \"-n22\", \"-n30\", \"-n8\", \"-q\"] }" > "$SETTINGS_DIR/settings.json"' >> /opt/vsix-cache/install-extensions.sh \
+    && echo 'fi' >> /opt/vsix-cache/install-extensions.sh \
+    # --- NOTIFY USER ---
     && echo 'if command -v code >/dev/null 2>&1; then' >> /opt/vsix-cache/install-extensions.sh \
-    && echo '    code --status-message "✅ LaTeX Setup Complete! Please Reload Window (Ctrl+R) to activate extensions."' >> /opt/vsix-cache/install-extensions.sh \
+    && echo '    code --status-message "✅ Setup Complete! Reload Window (Ctrl+R) to activate."' >> /opt/vsix-cache/install-extensions.sh \
     && echo 'fi' >> /opt/vsix-cache/install-extensions.sh \
     && chmod +x /opt/vsix-cache/install-extensions.sh
-
-# 5. Configure ChkTeX (Disable annoying warnings)
-# We add this while still running as USER vscode so permissions are correct
-RUN echo 'CmdLine { -n30 -n22 -n8 }' > /home/vscode/.chktexrc
 
 # Switch back to root
 USER root
