@@ -20,12 +20,19 @@ RUN mkdir -p /opt/vsix-cache && chown vscode:vscode /opt/vsix-cache
 USER vscode
 WORKDIR /opt/vsix-cache
 
-# Download VSIX files (LaTeX Workshop & Spell Checker)
-RUN curl -JL https://marketplace.visualstudio.com/_apis/public/gallery/publishers/james-yu/vsextensions/latex-workshop/latest/vspackage -o latex-workshop.vsix \
-    && curl -JL https://marketplace.visualstudio.com/_apis/public/gallery/publishers/streetsidesoftware/vsextensions/code-spell-checker/latest/vspackage -o code-spell-checker.vsix
+# We use a User-Agent to prevent the Marketplace from blocking the request.
+# We also use '-o' to explicitly name the files, ensuring they are saved correctly.
+RUN curl -f -L -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+    "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/james-yu/vsextensions/latex-workshop/latest/vspackage" \
+    -o latex-workshop.vsix \
+    && curl -f -L -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+    "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/streetsidesoftware/vsextensions/code-spell-checker/latest/vspackage" \
+    -o code-spell-checker.vsix
+
+# (Optional verify step: This will fail the build if the files are too small/corrupted)
+RUN if [ $(stat -c%s "latex-workshop.vsix") -lt 10000 ]; then echo "Error: Download failed"; exit 1; fi
 
 # 4. Create an 'Offline Install' Script
-# This script will run every time the container starts to ensure extensions are installed.
 RUN echo '#!/bin/bash' > /opt/vsix-cache/install-extensions.sh \
     && echo 'for file in /opt/vsix-cache/*.vsix; do' >> /opt/vsix-cache/install-extensions.sh \
     && echo '  code --install-extension "$file" --force' >> /opt/vsix-cache/install-extensions.sh \
